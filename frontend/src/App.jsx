@@ -7,11 +7,11 @@ export default function App() {
   const [identity, setIdentity] =
     useState(null);
 
-  const [loading, setLoading] =
-    useState(false);
-
   const [credentials, setCredentials] =
     useState([]);
+
+  const [loading, setLoading] =
+    useState(false);
 
   useEffect(() => {
 
@@ -31,7 +31,7 @@ export default function App() {
 
     const storedCredentials =
       localStorage.getItem(
-        "fluxlock_credentials"
+        "fluxlock_wallet_credentials"
       );
 
     if (storedCredentials) {
@@ -69,19 +69,19 @@ export default function App() {
       const data =
         await response.json();
 
-      setIdentity(data);
-
       localStorage.setItem(
         "fluxlock_wallet_identity",
         JSON.stringify(data)
       );
+
+      setIdentity(data);
 
     } catch (err) {
 
       console.error(err);
 
       alert(
-        "Failed to create identity"
+        "Identity creation failed"
       );
 
     } finally {
@@ -93,9 +93,7 @@ export default function App() {
   const authenticateIdentity =
     async () => {
 
-      if (!identity) {
-        return;
-      }
+      if (!identity) return;
 
       try {
 
@@ -147,57 +145,6 @@ export default function App() {
         const authData =
           await authResponse.json();
 
-        if (
-          authData.authenticated
-        ) {
-
-          const credential = {
-
-            credential_id:
-              "cred-" +
-              crypto.randomUUID(),
-
-            identity_id:
-              identity.identity_id,
-
-            validator_id: 0,
-
-            trust_score:
-              authData.trust,
-
-            continuity_score:
-              identity.continuity_score,
-
-            status:
-              authData.status,
-
-            issued_epoch:
-              authData.epoch_age,
-
-            issued_at:
-              Math.floor(
-                Date.now() / 1000
-              ),
-          };
-
-          const updated =
-            [
-              credential,
-              ...credentials,
-            ];
-
-          setCredentials(
-            updated
-          );
-
-          localStorage.setItem(
-            "fluxlock_credentials",
-            JSON.stringify(
-              updated
-            )
-          );
-        }
-
         alert(
           JSON.stringify(
             authData,
@@ -211,7 +158,60 @@ export default function App() {
         console.error(err);
 
         alert(
-          "Authentication Failed"
+          "Authentication failed"
+        );
+      }
+    };
+
+  const issueCredential =
+    async () => {
+
+      if (!identity) return;
+
+      try {
+
+        const response =
+          await fetch(
+            `${API}/credential/issue`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                identity_id:
+                  identity.identity_id,
+              }),
+            }
+          );
+
+        const credential =
+          await response.json();
+
+        const updated =
+          [
+            ...credentials,
+            credential,
+          ];
+
+        setCredentials(
+          updated
+        );
+
+        localStorage.setItem(
+          "fluxlock_wallet_credentials",
+          JSON.stringify(
+            updated
+          )
+        );
+
+      } catch (err) {
+
+        console.error(err);
+
+        alert(
+          "Credential issuance failed"
         );
       }
     };
@@ -227,11 +227,13 @@ export default function App() {
           "Arial, sans-serif",
       }}
     >
+
       <h1>
         Fluxlock Wallet
       </h1>
 
       {!identity && (
+
         <button
           onClick={
             createIdentity
@@ -246,19 +248,21 @@ export default function App() {
       )}
 
       {identity && (
+
         <div
           style={{
-            marginTop: "30px",
             background:
               "#0c1528",
             padding: "20px",
             borderRadius:
               "12px",
-            maxWidth: "700px",
+            maxWidth: "800px",
+            marginTop: "20px",
           }}
         >
+
           <h2>
-            Identity Created
+            Identity
           </h2>
 
           <p>
@@ -270,38 +274,23 @@ export default function App() {
           </p>
 
           <p>
-            <strong>
-              Validator:
-            </strong>{" "}
+            <strong>Status:</strong>{" "}
             {
-              identity.validator_id
+              identity.status
             }
           </p>
 
           <p>
-            <strong>
-              Trust:
-            </strong>{" "}
+            <strong>Trust:</strong>{" "}
             {
               identity.trust_score
             }
           </p>
 
           <p>
-            <strong>
-              Continuity:
-            </strong>{" "}
+            <strong>Continuity:</strong>{" "}
             {
               identity.continuity_score
-            }
-          </p>
-
-          <p>
-            <strong>
-              Status:
-            </strong>{" "}
-            {
-              identity.status
             }
           </p>
 
@@ -309,21 +298,27 @@ export default function App() {
             onClick={
               authenticateIdentity
             }
+          >
+            Authenticate
+          </button>
+
+          <button
+            onClick={
+              issueCredential
+            }
             style={{
-              marginTop:
+              marginLeft:
                 "15px",
-              padding:
-                "10px 20px",
-              cursor:
-                "pointer",
             }}
           >
-            Authenticate Identity
+            Issue Credential
           </button>
+
         </div>
       )}
 
       {credentials.length > 0 && (
+
         <div
           style={{
             marginTop: "30px",
@@ -332,73 +327,99 @@ export default function App() {
             padding: "20px",
             borderRadius:
               "12px",
-            maxWidth: "900px",
+            maxWidth: "1000px",
           }}
         >
+
           <h2>
             Credentials
           </h2>
 
-          {credentials.map(
-            (
-              credential
-            ) => (
-              <div
-                key={
-                  credential.credential_id
-                }
-                style={{
-                  marginBottom:
-                    "20px",
-                  padding:
-                    "15px",
-                  background:
-                    "#182c4d",
-                  borderRadius:
-                    "8px",
-                }}
-              >
-                <p>
-                  <strong>
-                    Credential:
-                  </strong>
-                  <br />
-                  {
-                    credential.credential_id
-                  }
-                </p>
+          {
+            credentials.map(
+              (
+                credential,
+                index
+              ) => (
 
-                <p>
-                  <strong>
-                    Status:
-                  </strong>{" "}
-                  {
-                    credential.status
-                  }
-                </p>
+                <div
+                  key={index}
+                  style={{
+                    marginBottom:
+                      "20px",
+                    background:
+                      "#1b3157",
+                    padding:
+                      "15px",
+                    borderRadius:
+                      "10px",
+                  }}
+                >
 
-                <p>
-                  <strong>
-                    Trust:
-                  </strong>{" "}
-                  {
-                    credential.trust_score
-                  }
-                </p>
+                  <p>
+                    <strong>
+                      Credential ID:
+                    </strong>
+                    <br />
+                    {
+                      credential.credential_id
+                    }
+                  </p>
 
-                <p>
-                  <strong>
-                    Continuity:
-                  </strong>{" "}
-                  {
-                    credential.continuity_score
-                  }
-                </p>
-              </div>
+                  <p>
+                    <strong>
+                      Type:
+                    </strong>{" "}
+                    {
+                      credential.credential_type
+                    }
+                  </p>
+
+                  <p>
+                    <strong>
+                      Issuer:
+                    </strong>{" "}
+                    {
+                      credential.issuer
+                    }
+                  </p>
+
+                  <p>
+                    <strong>
+                      Trust:
+                    </strong>{" "}
+                    {
+                      credential.trust_score
+                    }
+                  </p>
+
+                  <p>
+                    <strong>
+                      Continuity:
+                    </strong>{" "}
+                    {
+                      credential.continuity_score
+                    }
+                  </p>
+
+                  <p>
+                    <strong>
+                      Signature:
+                    </strong>
+                    <br />
+                    {
+                      credential.signature
+                    }
+                  </p>
+
+                </div>
+              )
             )
-          )}
+          }
+
         </div>
       )}
+
     </div>
   );
 }
