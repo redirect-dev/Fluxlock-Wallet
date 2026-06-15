@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const API = "http://127.0.0.1:3001";
 
@@ -9,6 +9,41 @@ export default function App() {
 
   const [loading, setLoading] =
     useState(false);
+
+  const [credentials, setCredentials] =
+    useState([]);
+
+  useEffect(() => {
+
+    const storedIdentity =
+      localStorage.getItem(
+        "fluxlock_wallet_identity"
+      );
+
+    if (storedIdentity) {
+
+      setIdentity(
+        JSON.parse(
+          storedIdentity
+        )
+      );
+    }
+
+    const storedCredentials =
+      localStorage.getItem(
+        "fluxlock_credentials"
+      );
+
+    if (storedCredentials) {
+
+      setCredentials(
+        JSON.parse(
+          storedCredentials
+        )
+      );
+    }
+
+  }, []);
 
   const createIdentity = async () => {
 
@@ -54,6 +89,132 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const authenticateIdentity =
+    async () => {
+
+      if (!identity) {
+        return;
+      }
+
+      try {
+
+        const signResponse =
+          await fetch(
+            `${API}/sign`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                message: "login",
+                validator_id: 0,
+              }),
+            }
+          );
+
+        const signData =
+          await signResponse.json();
+
+        const authResponse =
+          await fetch(
+            `${API}/auth/flow`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+              body: JSON.stringify({
+                message: "login",
+                signature:
+                  signData.signature,
+                validator_id: 0,
+                identity_id:
+                  identity.identity_id,
+                nonce:
+                  crypto.randomUUID(),
+                timestamp:
+                  Math.floor(
+                    Date.now() / 1000
+                  ),
+              }),
+            }
+          );
+
+        const authData =
+          await authResponse.json();
+
+        if (
+          authData.authenticated
+        ) {
+
+          const credential = {
+
+            credential_id:
+              "cred-" +
+              crypto.randomUUID(),
+
+            identity_id:
+              identity.identity_id,
+
+            validator_id: 0,
+
+            trust_score:
+              authData.trust,
+
+            continuity_score:
+              identity.continuity_score,
+
+            status:
+              authData.status,
+
+            issued_epoch:
+              authData.epoch_age,
+
+            issued_at:
+              Math.floor(
+                Date.now() / 1000
+              ),
+          };
+
+          const updated =
+            [
+              credential,
+              ...credentials,
+            ];
+
+          setCredentials(
+            updated
+          );
+
+          localStorage.setItem(
+            "fluxlock_credentials",
+            JSON.stringify(
+              updated
+            )
+          );
+        }
+
+        alert(
+          JSON.stringify(
+            authData,
+            null,
+            2
+          )
+        );
+
+      } catch (err) {
+
+        console.error(err);
+
+        alert(
+          "Authentication Failed"
+        );
+      }
+    };
 
   return (
     <div
@@ -145,84 +306,97 @@ export default function App() {
           </p>
 
           <button
-  onClick={async () => {
+            onClick={
+              authenticateIdentity
+            }
+            style={{
+              marginTop:
+                "15px",
+              padding:
+                "10px 20px",
+              cursor:
+                "pointer",
+            }}
+          >
+            Authenticate Identity
+          </button>
+        </div>
+      )}
 
-    try {
+      {credentials.length > 0 && (
+        <div
+          style={{
+            marginTop: "30px",
+            background:
+              "#102038",
+            padding: "20px",
+            borderRadius:
+              "12px",
+            maxWidth: "900px",
+          }}
+        >
+          <h2>
+            Credentials
+          </h2>
 
-      const signResponse =
-        await fetch(
-          `${API}/sign`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              message: "login",
-              validator_id: 0,
-            }),
-          }
-        );
+          {credentials.map(
+            (
+              credential
+            ) => (
+              <div
+                key={
+                  credential.credential_id
+                }
+                style={{
+                  marginBottom:
+                    "20px",
+                  padding:
+                    "15px",
+                  background:
+                    "#182c4d",
+                  borderRadius:
+                    "8px",
+                }}
+              >
+                <p>
+                  <strong>
+                    Credential:
+                  </strong>
+                  <br />
+                  {
+                    credential.credential_id
+                  }
+                </p>
 
-      const signData =
-        await signResponse.json();
+                <p>
+                  <strong>
+                    Status:
+                  </strong>{" "}
+                  {
+                    credential.status
+                  }
+                </p>
 
-      const authResponse =
-        await fetch(
-          `${API}/auth/flow`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type":
-                "application/json",
-            },
-            body: JSON.stringify({
-              message: "login",
-              signature:
-                signData.signature,
-              validator_id: 0,
-              identity_id:
-                identity.identity_id,
-              nonce:
-                crypto.randomUUID(),
-              timestamp:
-                Math.floor(
-                  Date.now() / 1000
-                ),
-            }),
-          }
-        );
+                <p>
+                  <strong>
+                    Trust:
+                  </strong>{" "}
+                  {
+                    credential.trust_score
+                  }
+                </p>
 
-      const authData =
-        await authResponse.json();
-
-      alert(
-        JSON.stringify(
-          authData,
-          null,
-          2
-        )
-      );
-
-    } catch (err) {
-
-      console.error(err);
-
-      alert(
-        "Authentication Failed"
-      );
-    }
-
-  }}
-  style={{
-    marginTop: "15px",
-    padding: "10px 20px",
-    cursor: "pointer",
-  }}
->
-  Authenticate Identity
-</button>
+                <p>
+                  <strong>
+                    Continuity:
+                  </strong>{" "}
+                  {
+                    credential.continuity_score
+                  }
+                </p>
+              </div>
+            )
+          )}
         </div>
       )}
     </div>
